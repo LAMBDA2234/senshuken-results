@@ -3,168 +3,244 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>District Senshuken — Results Hub</title>
+  <title>District Senshuken — Offline Results Hub</title>
   <style>
-    :root{
-      --bg:#05060a; --neon1:#00e5ff; --neon2:#7c3aed;
-      --glass: rgba(255,255,255,0.06);
-      font-family: Inter, system-ui;
-    }
+    :root{--bg:#05060a;--neon1:#00e5ff;--neon2:#7c3aed;--glass:rgba(255,255,255,0.06);font-family:Inter,system-ui,Arial}
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:#e6f2ff}
-    .wrap{max-width:1100px;margin:20px auto;padding:20px}
+    body{margin:0;background:radial-gradient(1000px 400px at 10% 10%, rgba(0,50,80,0.12), transparent),var(--bg);color:#e6f2ff}
+    .wrap{max-width:1000px;margin:20px auto;padding:20px}
     header{display:flex;justify-content:space-between;align-items:center}
-    .card{background:rgba(255,255,255,0.02);border:1px solid var(--glass);
-      padding:20px;border-radius:12px;margin-top:20px}
-    input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--glass);
-      background:rgba(255,255,255,0.04);color:#e6f2ff;margin-bottom:10px}
-    button{padding:10px 16px;border-radius:10px;border:none;cursor:pointer;font-weight:600}
-    .btn{background:linear-gradient(90deg,var(--neon1),var(--neon2));color:#00121a}
-    .btn-ghost{background:transparent;border:1px solid var(--glass);color:#e6f2ff}
-    .list{margin-top:20px;display:flex;flex-direction:column;gap:10px}
-    .entry{border:1px solid var(--glass);padding:12px;border-radius:10px;
-      background:rgba(255,255,255,0.02);display:flex;justify-content:space-between}
+    h1{margin:0;font-size:20px}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border:1px solid var(--glass);padding:16px;border-radius:12px;margin-top:16px}
+    input,select,textarea,button{font:inherit}
+    input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:inherit;margin-bottom:8px}
+    textarea{min-height:60px}
+    .row{display:flex;gap:8px}
+    .btn{background:linear-gradient(90deg,var(--neon1),var(--neon2));color:#041220;border:none;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:inherit;padding:8px;border-radius:10px;cursor:pointer}
+    .list{margin-top:12px;display:flex;flex-direction:column;gap:10px;max-height:56vh;overflow:auto;padding-right:6px}
+    .entry{display:flex;justify-content:space-between;gap:8px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:linear-gradient(90deg,rgba(255,255,255,0.01),rgba(255,255,255,0.02))}
+    .meta{font-size:12px;opacity:0.8}
     .badge{padding:6px 10px;border-radius:20px;font-weight:700}
     .medal-Gold{background:#ffd966;color:#1b1100}
     .medal-Silver{background:#e6e8ee;color:#08101a}
     .medal-Bronze{background:#e6ad7a;color:#2b1305}
-    .medal-None{background:transparent;border:1px dashed var(--glass);color:#e6f2ff}
+    .medal-None{background:transparent;border:1px dashed rgba(255,255,255,0.04)}
+    footer{margin-top:18px;text-align:center;color:rgba(230,242,255,0.6);font-size:13px}
+    @media (max-width:880px){.row{flex-direction:column}}
   </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>District Senshuken — Results Hub</h1>
-    <button id="exportBtn" class="btn-ghost">Export CSV</button>
-  </header>
+  <div class="wrap">
+    <header>
+      <h1>District Senshuken — Offline Results Hub</h1>
+      <div>
+        <button id="exportBtn" class="btn-ghost">Export CSV</button>
+        <button id="downloadJson" class="btn-ghost">Download JSON</button>
+      </div>
+    </header>
 
-  <section class="card">
-    <h3>Add Participant</h3>
-    <form id="addForm">
-      <input id="name" type="text" placeholder="Name" required>
-      <input id="age_group" type="text" placeholder="Age group">
-      <select id="gender"><option value="">Gender</option><option>Male</option><option>Female</option></select>
-      <select id="event"><option>Kata</option><option>Kumite</option><option>Team</option></select>
-      <select id="medal"><option>None</option><option>Gold</option><option>Silver</option><option>Bronze</option></select>
-      <textarea id="remarks" placeholder="Remarks"></textarea>
-      <button class="btn" type="submit">Save</button>
-      <button class="btn-ghost" type="button" id="refreshBtn">Refresh</button>
-    </form>
-    <div>Status: <span id="status">Not connected</span></div>
-  </section>
-
-  <section class="card">
-    <h3>Entries</h3>
-    <input id="search" type="text" placeholder="Search">
-    <select id="filterEvent"><option value="All">All</option><option>Kata</option><option>Kumite</option><option>Team</option></select>
-
-    <div class="list" id="list"></div>
-
-    <h3>Medal Tally</h3>
-    <div id="tally" style="display:flex;gap:12px;"></div>
-  </section>
-</div>
-
-<script>
-  const API_BASE = "https://script.google.com/macros/s/AKfycbyjEP2gOWhDbY97EYBKJZgn2qnl-vlh6NB5mAjvnu-Ht3qrKoESxkMD8divCEsqZsqVRg/exec";
-
-  const ADMIN_PASS = "senshuken123";
-  let ADMIN = false;
-  window.onload = ()=>{
-    const p = prompt("Admin password (blank = view only):");
-    if(p === ADMIN_PASS){ ADMIN = true; alert("Admin mode ON"); }
-  }
-
-  const statusEl = document.getElementById("status");
-  const listEl = document.getElementById("list");
-  const tallyEl = document.getElementById("tally");
-
-  function setStatus(s){ statusEl.textContent = s }
-
-  async function fetchEntries(){
-    try{
-      setStatus("Loading...");
-      const res = await fetch(API_BASE);
-      const data = await res.json();
-      renderList(data);
-      setStatus("Connected");
-    }catch(e){ setStatus("Error: "+e); }
-  }
-
-  function renderList(items){
-    const q = document.getElementById("search").value.toLowerCase();
-    const f = document.getElementById("filterEvent").value;
-
-    const filtered = items.filter(x=>{
-      if(f !== "All" && x.event !== f) return false;
-      if(q && !(x.name.toLowerCase().includes(q) || (x.remarks||"").toLowerCase().includes(q))) return false;
-      return true;
-    });
-
-    listEl.innerHTML = "";
-    filtered.forEach(x=>{
-      const div = document.createElement("div");
-      div.className = "entry";
-      div.innerHTML = `
-        <div>
-          <div><b>${x.name}</b></div>
-          <div>${x.age_group||'-'} · ${x.gender||'-'} · ${x.event}</div>
-          <div>${x.remarks||''}</div>
+    <section class="card">
+      <h3 style="margin-top:0">Add / Edit Participant</h3>
+      <form id="form">
+        <input id="name" placeholder="Full name" required />
+        <div class="row">
+          <input id="age_group" placeholder="Age group (e.g. Under-14)" />
+          <select id="gender"><option value="">Gender</option><option>Male</option><option>Female</option><option>Other</option></select>
         </div>
-        <div style="text-align:right;">
-          <div class="badge medal-${x.medal}">${x.medal}</div>
-          <div style="font-size:12px;opacity:0.6;">${x.created_at}</div>
+        <div class="row">
+          <select id="event"><option>Kata</option><option>Kumite</option><option>Team</option></select>
+          <select id="medal"><option>None</option><option>Gold</option><option>Silver</option><option>Bronze</option></select>
         </div>
-      `;
-      listEl.appendChild(div);
-    });
+        <textarea id="remarks" placeholder="Remarks (optional)"></textarea>
 
-    const tally = {Gold:0,Silver:0,Bronze:0,None:0};
-    items.forEach(x=> tally[x.medal]++ );
-    tallyEl.innerHTML = Object.entries(tally)
-      .map(([k,v])=> `<div class="badge medal-${k}">${k}: ${v}</div>`)
-      .join("");
-  }
+        <div style="display:flex;gap:8px">
+          <button id="saveBtn" class="btn" type="submit">Save</button>
+          <button id="clearBtn" type="button" class="btn-ghost">Clear</button>
+          <button id="cancelEdit" type="button" class="btn-ghost" style="display:none">Cancel Edit</button>
+        </div>
+        <div style="margin-top:8px;color:rgba(230,242,255,0.7)">Status: <span id="status">Ready (offline)</span></div>
+      </form>
+    </section>
 
-  document.getElementById("addForm").onsubmit = async(e)=>{
-    e.preventDefault();
-    if(!ADMIN) return alert("Admin only");
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3 style="margin:0">Entries</h3>
+        <div class="meta">Total: <span id="count">0</span></div>
+      </div>
 
-    const payload = {
-      name: name.value.trim(),
-      age_group: age_group.value.trim(),
-      gender: gender.value,
-      event: event.value,
-      medal: medal.value,
-      remarks: remarks.value.trim()
-    };
+      <div style="display:flex;gap:8px;margin-top:8px;margin-bottom:8px">
+        <input id="search" placeholder="Search name or remarks" />
+        <select id="filterEvent"><option value="All">All</option><option>Kata</option><option>Kumite</option><option>Team</option></select>
+      </div>
 
-    try{
-      setStatus("Saving...");
-      await fetch(API_BASE,{
-        method:"POST",
-        body: JSON.stringify(payload)
+      <div class="list" id="list"></div>
+
+      <h4 style="margin-top:12px">Medal Tally</h4>
+      <div id="tally" style="display:flex;gap:10px;margin-top:8px"></div>
+    </section>
+
+    <footer>Local device only — export CSV after the event and upload to Google Sheets if needed.</footer>
+  </div>
+
+  <script>
+    // Offline localStorage implementation
+    const STORAGE_KEY = 'senshuken_participants_v1';
+    let entries = [];
+    let editId = null; // index in entries
+
+    // DOM refs
+    const form = document.getElementById('form');
+    const nameIn = document.getElementById('name');
+    const ageIn = document.getElementById('age_group');
+    const genderIn = document.getElementById('gender');
+    const eventIn = document.getElementById('event');
+    const medalIn = document.getElementById('medal');
+    const remarksIn = document.getElementById('remarks');
+    const listEl = document.getElementById('list');
+    const countEl = document.getElementById('count');
+    const statusEl = document.getElementById('status');
+    const search = document.getElementById('search');
+    const filterEvent = document.getElementById('filterEvent');
+    const exportBtn = document.getElementById('exportBtn');
+    const downloadJson = document.getElementById('downloadJson');
+    const cancelEdit = document.getElementById('cancelEdit');
+
+    // init
+    function load(){
+      try{ entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){ entries = []; }
+      render();
+    }
+
+    function saveLocal(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+      render();
+    }
+
+    function nowStr(){ return new Date().toLocaleString(); }
+
+    function render(){
+      const q = (search.value || '').toLowerCase();
+      const f = filterEvent.value;
+      const filtered = entries.filter(e => {
+        if(f !== 'All' && e.event !== f) return false;
+        if(q && !( (e.name||'').toLowerCase().includes(q) || (e.remarks||'').toLowerCase().includes(q) )) return false;
+        return true;
       });
-      setStatus("Saved");
-      e.target.reset();
-      fetchEntries();
-    }catch(err){ alert("Error: "+err); }
-  }
 
-  search.oninput = fetchEntries;
-  filterEvent.onchange = fetchEntries;
-  refreshBtn.onclick = fetchEntries;
+      listEl.innerHTML = '';
+      filtered.forEach((e, idx)=>{
+        const div = document.createElement('div'); div.className = 'entry';
+        div.innerHTML = `
+          <div>
+            <div style="font-weight:700">${escapeHtml(e.name)}</div>
+            <div class="meta">${escapeHtml(e.age_group||'-')} · ${escapeHtml(e.gender||'-')} · ${escapeHtml(e.event||'-')}</div>
+            ${e.remarks? `<div style="margin-top:6px">${escapeHtml(e.remarks)}</div>` : ''}
+          </div>
+          <div style="text-align:right">
+            <div class="badge medal-${e.medal||'None'}">${e.medal||'None'}</div>
+            <div class="meta" style="margin-top:6px">${e.created_at}</div>
+            <div style="margin-top:8px;display:flex;gap:6px;justify-content:flex-end">
+              <button data-idx="${idx}" class="btn-ghost editBtn">Edit</button>
+              <button data-idx="${idx}" class="btn-ghost delBtn">Delete</button>
+            </div>
+          </div>
+        `;
+        listEl.appendChild(div);
+      });
 
-  async function exportCSV(){
-    const res = await fetch(API_BASE);
-    const data = await res.json();
-    const rows = ["Name,Age Group,Gender,Event,Medal,Remarks,Created At"];
-    data.forEach(r=>{
-      rows.push(`${r.name},${r.age_group},${r.gender},${r.event},${r.medal},${(r.remarks||"").replace(/,/g," ")},${r.created_at}`);
+      countEl.textContent = entries.length;
+      updateTally();
+    }
+
+    function updateTally(){
+      const tally = {Gold:0,Silver:0,Bronze:0,None:0};
+      entries.forEach(e=> tally[e.medal||'None']= (tally[e.medal||'None']||0) + 1);
+      const el = document.getElementById('tally');
+      el.innerHTML = Object.entries(tally).map(([k,v])=> `<div class="badge medal-${k}">${k}: ${v}</div>`).join('');
+    }
+
+    // escape
+    function escapeHtml(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // add / update
+    form.addEventListener('submit', (ev)=>{
+      ev.preventDefault();
+      const payload = {
+        name: nameIn.value.trim(),
+        age_group: ageIn.value.trim(),
+        gender: genderIn.value,
+        event: eventIn.value,
+        medal: medalIn.value,
+        remarks: remarksIn.value.trim(),
+        created_at: nowStr()
+      };
+      if(!payload.name) return alert('Name required');
+
+      if(editId === null){
+        entries.push(payload);
+        statusEl.textContent = 'Saved locally';
+      } else {
+        // keep original created_at
+        payload.created_at = entries[editId].created_at || payload.created_at;
+        entries[editId] = payload;
+        statusEl.textContent = 'Updated locally';
+        editId = null; cancelEdit.style.display = 'none';
+      }
+      saveLocal();
+      form.reset();
     });
-    const blob = new Blob([rows.join("
-")],{type:"text/csv"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href=url; a.download="participants.csv"; a.click();
-  }
-  exportBtn.onclick = export
+
+    // edit/delete handlers (event delegation)
+    listEl.addEventListener('click', (e)=>{
+      const edit = e.target.closest('.editBtn');
+      const del = e.target.closest('.delBtn');
+      if(edit){
+        const i = Number(edit.dataset.idx);
+        startEdit(i);
+      } else if(del){
+        const i = Number(del.dataset.idx);
+        if(confirm('Delete this entry?')){ entries.splice(i,1); saveLocal(); statusEl.textContent='Deleted locally'; }
+      }
+    });
+
+    function startEdit(i){
+      editId = i;
+      const e = entries[i];
+      nameIn.value = e.name; ageIn.value = e.age_group; genderIn.value = e.gender; eventIn.value = e.event; medalIn.value = e.medal; remarksIn.value = e.remarks;
+      cancelEdit.style.display = 'inline-block';
+      statusEl.textContent = 'Editing...';
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+
+    cancelEdit.addEventListener('click', ()=>{ editId = null; form.reset(); cancelEdit.style.display='none'; statusEl.textContent='Ready'; });
+
+    // export CSV
+    exportBtn.addEventListener('click', ()=>{
+      if(!entries.length) return alert('No entries to export');
+      const rows = [['Name','Age Group','Gender','Event','Medal','Remarks','Created At']];
+      entries.forEach(r=> rows.push([r.name,r.age_group,r.gender,r.event,r.medal,(r.remarks||'').replace(/
+/g,' '),r.created_at]));
+      const csv = rows.map(r=> r.map(c=> '"'+String(c).replace(/"/g,'""')+'"').join(',')).join('
+');
+      const blob = new Blob([csv],{type:'text/csv'});
+      const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='participants.csv'; a.click(); URL.revokeObjectURL(url);
+    });
+
+    downloadJson.addEventListener('click', ()=>{
+      const blob = new Blob([JSON.stringify(entries, null, 2)],{type:'application/json'});
+      const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='participants.json'; a.click(); URL.revokeObjectURL(url);
+    });
+
+    // search/filter
+    search.addEventListener('input', render);
+    filterEvent.addEventListener('change', render);
+
+    // keyboard shortcut: Ctrl+E to export CSV
+    window.addEventListener('keydown', (e)=>{ if(e.ctrlKey && e.key.toLowerCase()==='e'){ e.preventDefault(); exportBtn.click(); } });
+
+    // initial load
+    load();
+  </script>
+</body>
+</html>
