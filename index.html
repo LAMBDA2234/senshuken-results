@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Senshuken — Simple Offline Recorder</title>
+  <title>Senshuken — Offline Recorder (IndexedDB)</title>
   <style>
     body{font-family:Arial;margin:0;background:#0b0d12;color:#e8f0ff;padding:20px}
     h1{margin:0 0 10px 0;font-size:22px}
     .box{background:#111522;border:1px solid #2a2f40;padding:16px;border-radius:10px;margin-bottom:16px}
-    input,select,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #33383f;background:#1a1f2b;color:white;margin-bottom:10px}
+    input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #33383f;background:#1a1f2b;color:white;margin-bottom:10px}
     button{padding:10px 14px;border-radius:8px;border:none;cursor:pointer;font-weight:bold}
     .saveBtn{background:#00e0ff;color:#00121a}
     .clearBtn{background:#2a2f40;color:white}
@@ -22,20 +22,22 @@
 </head>
 <body>
 
-<h1>Senshuken — Simple Offline Recorder</h1>
+<h1>Senshuken — Offline Recorder (IndexedDB)</h1>
 
 <div class="box">
   <h3>Add Participant</h3>
   <form id="form">
     <input id="name" placeholder="Name" required>
     <input id="age" placeholder="Age Group (e.g. U-14)">
+
     <select id="event">
       <option>Kata</option><option>Kumite</option><option>Team</option>
     </select>
+
     <select id="medal">
       <option>None</option><option>Gold</option><option>Silver</option><option>Bronze</option>
     </select>
-    <textarea id="remarks" placeholder="Remarks (optional)"></textarea>
+
     <button class="saveBtn" type="submit">Save</button>
     <button class="clearBtn" type="button" id="clear">Clear</button>
   </form>
@@ -48,30 +50,74 @@
 </div>
 
 <script>
-let data = JSON.parse(localStorage.getItem("senshuken_simple") || "[]");
+// ------------------ IndexedDB Setup ------------------
+let db;
+const DB_NAME = 'senshukenDB';
+const STORE = 'participants';
+
+const request = indexedDB.open(DB_NAME, 1);
+
+request.onupgradeneeded = (event)=>{
+  db = event.target.result;
+  if(!db.objectStoreNames.contains(STORE)){
+    db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+  }
+};
+
+request.onsuccess = ()=>{
+  db = request.result;
+  loadData();
+};
+
+request.onerror = ()=> alert('IndexedDB failed to load');
+
+//-------------------------------------------------------
+
+function addToDB(obj){
+  const tx = db.transaction(STORE, 'readwrite');
+  tx.objectStore(STORE).add(obj);
+  tx.oncomplete = loadData;
+}
+
+function getAll(){
+  return new Promise(resolve=>{
+    const tx = db.transaction(STORE, 'readonly');
+    const store = tx.objectStore(STORE);
+    const req = store.getAll();
+    req.onsuccess = ()=> resolve(req.result || []);
+  })
+}
+
+//-------------------------------------------------------
 
 const list = document.getElementById("list");
 const count = document.getElementById("count");
 
-function saveLocal(){ localStorage.setItem("senshuken_simple", JSON.stringify(data)); }
+async function loadData(){
+  const data = await getAll();
+  render(data);
+}
 
-function render(){
+function render(data){
   list.innerHTML = "";
-  data.forEach((e,i)=>{
+
+  data.forEach((e)=>{
     list.innerHTML += `
       <div class='entry'>
         <div>
           <b>${e.name}</b><br>
           <small>${e.age} • ${e.event}</small><br>
-          ${e.remarks? `<small>${e.remarks}</small>` : ''}
         </div>
         <div class="badge ${e.medal}">${e.medal}</div>
       </div>`;
   });
+
   count.textContent = data.length;
 }
 
-render();
+//-------------------------------------------------------
+// Form Logic
+//-------------------------------------------------------
 
 form.onsubmit = (ev)=>{
   ev.preventDefault();
@@ -80,24 +126,29 @@ form.onsubmit = (ev)=>{
     age: age.value.trim(),
     event: event.value,
     medal: medal.value,
-    remarks: remarks.value.trim(),
     time: new Date().toLocaleString()
   };
   if(!obj.name) return alert("Name required");
-  data.push(obj);
-  saveLocal();
-  render();
+
+  addToDB(obj);
   form.reset();
 }
 
 clear.onclick = ()=> form.reset();
 
-export.onclick = ()=>{
-  if(!data.length) return alert("No entries");
-  const rows = ["Name,Age,Event,Medal,Remarks,Time"];
+//-------------------------------------------------------
+// Export CSV
+//-------------------------------------------------------
+
+export.onclick = async ()=>{
+  const data = await getAll();
+  if(!data.length) return alert("No entries to export");
+
+  const rows = ["Name,Age,Event,Medal,Time"];
   data.forEach(r=>{
-    rows.push(`"${r.name}","${r.age}","${r.event}","${r.medal}","${r.remarks}","${r.time}"`)
+    rows.push(`"${r.name}","${r.age}","${r.event}","${r.medal}","${r.time}"`)
   });
+
   const blob = new Blob([rows.join("\n")],{type:"text/csv"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -106,7 +157,7 @@ export.onclick = ()=>{
   a.click();
   URL.revokeObjectURL(url);
 }
-</script>
 
+</script>
 </body>
 </html>
