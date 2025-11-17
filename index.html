@@ -1,0 +1,324 @@
+<!--
+  District Senshuken - Single-file Static Frontend
+  - Vanilla HTML + CSS + JS
+  - Multi-user cloud (Supabase) without login (Public insert/update for event day)
+  USAGE:
+    1) Create a Supabase project
+    2) Create table `participants` with columns:
+       - id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY
+       - name text
+       - age_group text
+       - gender text
+       - event text
+       - medal text
+       - remarks text
+       - created_at timestamptz DEFAULT now()
+    3) In Supabase > API get your Project URL and anon public key
+    4) Replace SUPABASE_URL and SUPABASE_ANON_KEY below
+    5) Upload this file to Netlify / Vercel / GitHub Pages
+-->
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>District Senshuken — Results Hub</title>
+  <style>
+    /* Futuristic neon theme */
+    :root{
+      --bg:#05060a; --panel:#071028; --neon1:#00e5ff; --neon2:#7c3aed; --glass: rgba(255,255,255,0.06);
+      --accent-grad: linear-gradient(90deg,var(--neon1),var(--neon2));
+      --glass-border: rgba(255,255,255,0.06);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:radial-gradient(1200px 600px at 10% 10%, rgba(0,50,80,0.18), transparent 6%), radial-gradient(900px 400px at 90% 90%, rgba(120,20,160,0.12), transparent 6%), var(--bg); color:#e6f2ff}
+    .wrap{max-width:1100px;margin:28px auto;padding:24px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{width:56px;height:56px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(160deg,#001f2a00 0%, rgba(255,255,255,0.02) 40%), rgba(255,255,255,0.02);border:1px solid var(--glass-border);backdrop-filter: blur(6px)}
+    .logo svg{filter: drop-shadow(0 6px 18px rgba(0,0,0,0.6))}
+    h1{font-size:20px;margin:0}
+    p.lead{margin:0;color:rgba(230,242,255,0.75);font-size:13px}
+
+    main{display:grid;grid-template-columns:320px 1fr;gap:20px;margin-top:18px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid var(--glass-border);padding:18px;border-radius:14px;box-shadow:0 6px 24px rgba(2,6,23,0.6)}
+
+    label{display:block;font-size:12px;color:rgba(230,242,255,0.7);margin-bottom:6px}
+    input[type=text], select, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:inherit;outline:none}
+    textarea{resize:vertical}
+    .muted{color:rgba(230,242,255,0.5);font-size:13px}
+    .row{display:flex;gap:10px}
+    button{background:var(--accent-grad);border:none;padding:10px 14px;border-radius:10px;color:#00121a;font-weight:700;cursor:pointer}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:inherit}
+
+    .list{display:flex;flex-direction:column;gap:10px;max-height:64vh;overflow:auto;padding-right:6px}
+    .entry{display:flex;justify-content:space-between;gap:10px;padding:12px;border-radius:12px;background:linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.03)}
+    .entry .left{display:flex;flex-direction:column}
+    .meta{font-size:12px;color:rgba(230,242,255,0.6)}
+    .badge{padding:6px 8px;border-radius:999px;font-weight:700}
+    .medal-Gold{background:linear-gradient(90deg,#ffd966,#ffb84d);color:#1b1100}
+    .medal-Silver{background:linear-gradient(90deg,#e6e8ee,#d7d9df);color:#08101a}
+    .medal-Bronze{background:linear-gradient(90deg,#f1c7a8,#e39a6f);color:#2b1305}
+    .medal-None{background:transparent;border:1px dashed rgba(255,255,255,0.04);color:rgba(255,255,255,0.8)}
+
+    footer{margin-top:20px;text-align:center;color:rgba(230,242,255,0.55);font-size:13px}
+
+    /* responsive */
+    @media (max-width:880px){main{grid-template-columns:1fr} .logo{width:48px;height:48px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 12h18" stroke="#00e5ff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 7l6-4 6 4" stroke="#7c3aed" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div>
+          <h1>District Senshuken — Results Hub</h1>
+          <p class="lead">Stylish · Futuristic · Cloud multi-user</p>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="muted">Event: <strong>District Karate — 18 Nov 2025</strong></div>
+        <button id="exportBtn" class="btn-ghost">Export CSV</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="card">
+        <h3 style="margin:0 0 10px 0">Add Participant</h3>
+        <form id="addForm">
+          <label>Name <input id="name" type="text" required placeholder="Full name"></label>
+          <label>Age group <input id="age_group" type="text" placeholder="e.g. Under-14"></label>
+          <label>Gender
+            <select id="gender"><option value="">Prefer not to say</option><option>Male</option><option>Female</option><option>Other</option></select>
+          </label>
+          <label>Event
+            <select id="event"><option>Kata</option><option>Kumite</option><option>Team</option></select>
+          </label>
+          <label>Medal
+            <select id="medal"><option>None</option><option>Gold</option><option>Silver</option><option>Bronze</option></select>
+          </label>
+          <label>Remarks <textarea id="remarks" rows="2" placeholder="optional"></textarea></label>
+
+          <div style="display:flex;gap:10px;margin-top:10px">
+            <button type="submit">Save</button>
+            <button type="button" id="clearBtn" class="btn-ghost">Clear</button>
+            <button type="button" id="refreshBtn" class="btn-ghost">Refresh</button>
+          </div>
+        </form>
+
+        <div style="margin-top:12px;color:rgba(230,242,255,0.6);font-size:13px">Status: <span id="status">Not connected</span></div>
+      </section>
+
+      <section class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div style="font-weight:700">Entries</div>
+            <div class="muted" id="count">0 participants</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="search" type="text" placeholder="Search name or remarks" style="padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit">
+            <select id="filterEvent" style="padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit"><option value="All">All</option><option>Kata</option><option>Kumite</option><option>Team</option></select>
+          </div>
+        </div>
+
+        <div class="list" id="list"></div>
+
+        <div style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.03);padding-top:12px">
+          <div style="font-weight:700">Medal Tally</div>
+          <div style="display:flex;gap:12px;margin-top:8px" id="tally"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Built for District Senshuken — single-file cloud frontend. Replace Supabase keys in the code and deploy.
+    </footer>
+  </div>
+
+  <script type="module">
+    // ---------- CONFIG: REPLACE THESE ----------
+    const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
+    const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY';
+
+    // --------- ADMIN PASSWORD ---------
+    const ADMIN_PASS = 'senshuken123';
+    let ADMIN_UNLOCKED = false;
+
+    window.addEventListener('load', () => {
+      const p = prompt('Enter Admin Password (leave blank for view-only):');
+      if(p === ADMIN_PASS){ ADMIN_UNLOCKED = true; alert('Admin mode unlocked'); }
+      else alert('View-only mode');
+    });
+    // -------------------------------------------
+
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+    // DOM
+    const statusEl = document.getElementById('status')
+    const listEl = document.getElementById('list')
+    const countEl = document.getElementById('count')
+    const tallyEl = document.getElementById('tally')
+    const addForm = document.getElementById('addForm')
+    const exportBtn = document.getElementById('exportBtn')
+
+    // helpers
+    const medalClasses = {
+      'Gold': 'medal-Gold',
+      'Silver': 'medal-Silver',
+      'Bronze': 'medal-Bronze',
+      'None': 'medal-None'
+    }
+
+    function setStatus(s){ statusEl.textContent = s }
+
+    async function fetchEntries(){
+      try{
+        const { data, error } = await supabase.from('participants').select('*').order('created_at', { ascending: true })
+        if(error) throw error
+        renderList(data || [])
+        setStatus('Connected')
+      }catch(err){ console.error(err); setStatus('Error: '+err.message) }
+    }
+
+    function renderList(items){
+      const q = document.getElementById('search').value.toLowerCase()
+      const eventFilter = document.getElementById('filterEvent').value
+      const filtered = items.filter(it => {
+        if(eventFilter !== 'All' && it.event !== eventFilter) return false
+        if(q && !((it.name||'').toLowerCase().includes(q) || (it.remarks||'').toLowerCase().includes(q))) return false
+        return true
+      })
+
+      countEl.textContent = `${filtered.length} participants`
+      listEl.innerHTML = ''
+      filtered.forEach(it => {
+        const div = document.createElement('div'); div.className = 'entry'
+        const left = document.createElement('div'); left.className = 'left'
+        const title = document.createElement('div'); title.style.fontWeight = 700; title.textContent = it.name
+        const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = `${it.age_group || '—'} · ${it.gender || '—'} · ${it.event || '—'}`
+        const remarks = document.createElement('div'); remarks.className = 'muted'; remarks.style.marginTop='6px'; remarks.textContent = it.remarks || ''
+        left.appendChild(title); left.appendChild(meta); if(it.remarks) left.appendChild(remarks)
+
+        const right = document.createElement('div'); right.style.display='flex'; right.style.flexDirection='column'; right.style.alignItems='flex-end'; right.style.gap='8px'
+        const badge = document.createElement('div'); badge.className = 'badge '+(medalClasses[it.medal]||'medal-None'); badge.textContent = it.medal || 'None'
+        const small = document.createElement('div'); small.className='meta'; small.textContent = new Date(it.created_at).toLocaleString()
+
+        // edit controls
+        const controls = document.createElement('div'); controls.style.display='flex'; controls.style.gap='6px';
+        const editBtn = document.createElement('button'); editBtn.className='btn-ghost'; editBtn.textContent='Edit';
+        const delBtn = document.createElement('button'); delBtn.className='btn-ghost'; delBtn.textContent='Delete';
+        editBtn.onclick = ()=> openEditModal(it)
+        delBtn.onclick = ()=> deleteEntry(it.id)
+        controls.appendChild(editBtn); controls.appendChild(delBtn)
+
+        right.appendChild(badge); right.appendChild(small); right.appendChild(controls)
+
+        div.appendChild(left); div.appendChild(right)
+        listEl.appendChild(div)
+      })
+
+      // update tally
+      const tally = { 'Gold':0,'Silver':0,'Bronze':0,'None':0 }
+      items.forEach(i=>{ tally[i.medal||'None'] = (tally[i.medal||'None']||0)+1 })
+      tallyEl.innerHTML = ''
+      Object.entries(tally).forEach(([k,v])=>{
+        const b = document.createElement('div'); b.className = 'badge '+(medalClasses[k]||'medal-None'); b.style.padding='8px 12px'; b.style.display='flex'; b.style.flexDirection='column'; b.style.alignItems='center'
+        const t = document.createElement('div'); t.style.fontSize='12px'; t.textContent=k
+        const n = document.createElement('div'); n.style.fontWeight=800; n.style.marginTop='6px'; n.textContent=v
+        b.appendChild(t); b.appendChild(n); tallyEl.appendChild(b)
+      })
+    }
+
+    async function addEntry(e){
+      e.preventDefault()
+      const payload = {
+        name: document.getElementById('name').value.trim(),
+        age_group: document.getElementById('age_group').value.trim(),
+        gender: document.getElementById('gender').value,
+        event: document.getElementById('event').value,
+        medal: document.getElementById('medal').value,
+        remarks: document.getElementById('remarks').value.trim()
+      }
+      if(!payload.name) return alert('Name required')
+      const { data, error } = await supabase.from('participants').insert([payload]).select()
+      if(error){ console.error(error); alert('Insert failed: '+error.message); return }
+      // optimistic refresh
+      fetchEntries()
+      addForm.reset()
+    }
+
+    async function deleteEntry(id){
+      if(!confirm('Delete this entry?')) return
+      const { error } = await supabase.from('participants').delete().eq('id', id)
+      if(error){ alert('Delete failed: '+error.message); return }
+      fetchEntries()
+    }
+
+    function openEditModal(item){
+      // small inline edit using prompt for speed
+      const newMedal = prompt('Change medal (None/Gold/Silver/Bronze):', item.medal || 'None')
+      if(newMedal === null) return
+      const allowed = ['None','Gold','Silver','Bronze']
+      if(!allowed.includes(newMedal)) return alert('Invalid value')
+      supabase.from('participants').update({ medal: newMedal }).eq('id', item.id).then(res=>{
+        if(res.error) return alert('Update failed: '+res.error.message)
+        fetchEntries()
+      })
+    }
+
+    function exportCSV(items){
+      const headers = ['Name','Age Group','Gender','Event','Medal','Remarks']
+      supabase.from('participants').select('*').then(({data,error})=>{
+        if(error){ alert('Export failed: '+error.message); return }
+        const rows = [headers.join(',')]
+        data.forEach(r=>{
+          const line = [r.name||'', r.age_group||'', r.gender||'', r.event||'', r.medal||'', (r.remarks||'').replace(/\n/g,' ')]
+          // simple CSV escape
+          rows.push(line.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(','))
+        })
+        const csv = rows.join('\n')
+        const blob = new Blob([csv], { type: 'text/csv' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a'); a.href=url; a.download='participants.csv'; a.click(); URL.revokeObjectURL(url)
+      })
+    }
+
+    // events
+    addForm.addEventListener('submit', addEntry)
+    document.getElementById('clearBtn').addEventListener('click', ()=> addForm.reset())
+    document.getElementById('refreshBtn').addEventListener('click', fetchEntries)
+    document.getElementById('search').addEventListener('input', fetchEntries)
+    document.getElementById('filterEvent').addEventListener('change', fetchEntries)
+    exportBtn.addEventListener('click', exportCSV)
+
+    // realtime subscription (optional): listen for inserts/updates/deletes
+    function subscribeRealtime(){
+      supabase.channel('public:participants')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'participants' }, payload => {
+          // simply refresh on any change
+          fetchEntries()
+        }).subscribe()
+    }
+
+    // init
+    (async ()=>{
+      setStatus('Connecting...')
+      try{
+        // quick test to ensure keys set
+        const { data, error } = await supabase.from('participants').select('id').limit(1)
+        if(error) throw error
+        setStatus('Connected')
+        fetchEntries()
+        subscribeRealtime()
+      }catch(err){ setStatus('Disconnected — check SUPABASE_URL/ANON_KEY in the code'); console.error(err) }
+    })()
+
+  </script>
+</body>
+</html>
