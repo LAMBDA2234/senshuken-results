@@ -1,163 +1,191 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Senshuken — Offline Recorder (IndexedDB)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Senshuken — Firebase Cloud Results</title>
   <style>
-    body{font-family:Arial;margin:0;background:#0b0d12;color:#e8f0ff;padding:20px}
-    h1{margin:0 0 10px 0;font-size:22px}
-    .box{background:#111522;border:1px solid #2a2f40;padding:16px;border-radius:10px;margin-bottom:16px}
-    input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #33383f;background:#1a1f2b;color:white;margin-bottom:10px}
-    button{padding:10px 14px;border-radius:8px;border:none;cursor:pointer;font-weight:bold}
-    .saveBtn{background:#00e0ff;color:#00121a}
-    .clearBtn{background:#2a2f40;color:white}
-    .entry{padding:10px;border-radius:8px;background:#151a26;border:1px solid #252a36;margin-bottom:10px;display:flex;justify-content:space-between}
-    .badge{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:bold}
+    :root{
+      --bg:#05060a; --panel:#111522; --neon1:#00e5ff; --neon2:#7c3aed; --glass:rgba(255,255,255,0.06);
+      font-family:Inter, system-ui, Arial, sans-serif;
+    }
+    body{margin:0;background:var(--bg);color:#e6f2ff;padding:20px}
+    .wrap{max-width:980px;margin:0 auto}
+    header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    h1{margin:0;font-size:20px}
+    .card{background:var(--panel);border:1px solid var(--glass);padding:16px;border-radius:12px;margin-top:16px}
+    input,select{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit;margin-bottom:10px}
+    button{padding:10px 14px;border-radius:10px;border:none;cursor:pointer;font-weight:700}
+    .btn{background:linear-gradient(90deg,var(--neon1),var(--neon2));color:#00121a}
+    .ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:inherit}
+    .list{margin-top:12px;display:flex;flex-direction:column;gap:8px;max-height:58vh;overflow:auto;padding-right:6px}
+    .entry{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;
+      border:1px solid rgba(255,255,255,0.03);background:linear-gradient(90deg,rgba(255,255,255,0.01),rgba(255,255,255,0.02))}
+    .meta{font-size:12px;opacity:0.8}
+    .badge{padding:6px 12px;border-radius:999px;font-weight:800}
     .Gold{background:#ffd966;color:#1b1100}
-    .Silver{background:#dfe3e8;color:#08101a}
-    .Bronze{background:#e0a47a;color:#2b1305}
-    .None{background:transparent;border:1px dashed #3c4454;color:#9ba3b5}
+    .Silver{background:#e6e8ee;color:#08101a}
+    .Bronze{background:#e6ad7a;color:#2b1305}
+    .None{background:transparent;border:1px dashed rgba(255,255,255,0.06);color:#e6f2ff}
+    footer{margin-top:18px;text-align:center;color:rgba(230,242,255,0.6);font-size:13px}
+    @media (max-width:720px){header{flex-direction:column;align-items:flex-start}}
   </style>
 </head>
 <body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Senshuken — Cloud Results</h1>
+      <div style="opacity:0.7;font-size:13px">Realtime multi-user (Firebase)</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="exportBtn" class="ghost">Export CSV</button>
+      <button id="refreshBtn" class="ghost">Refresh</button>
+    </div>
+  </header>
 
-<h1>Senshuken — Offline Recorder (IndexedDB)</h1>
+  <section class="card">
+    <h3 style="margin:0">Add participant</h3>
+    <form id="addForm">
+      <input id="name" placeholder="Full Name" required />
+      <input id="age_group" placeholder="Age Group (e.g. U-14)" />
+      <select id="gender">
+        <option value="">Gender</option><option>Male</option><option>Female</option><option>Other</option>
+      </select>
+      <select id="event">
+        <option>Kata</option><option>Kumite</option><option>Team</option>
+      </select>
+      <select id="medal">
+        <option>None</option><option>Gold</option><option>Silver</option><option>Bronze</option>
+      </select>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn" type="submit">Save</button>
+        <button type="button" id="clearBtn" class="ghost">Clear</button>
+      </div>
+      <div style="margin-top:8px">Status: <span id="status">Not Connected</span></div>
+    </form>
+  </section>
 
-<div class="box">
-  <h3>Add Participant</h3>
-  <form id="form">
-    <input id="name" placeholder="Name" required>
-    <input id="age" placeholder="Age Group (e.g. U-14)">
+  <section class="card">
+    <h3 style="margin:0">Entries (<span id="count">0</span>)</h3>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input id="search" placeholder="Search name..." />
+      <select id="filterEvent"><option>All</option><option>Kata</option><option>Kumite</option><option>Team</option></select>
+    </div>
+    <div class="list" id="list"></div>
+  </section>
 
-    <select id="event">
-      <option>Kata</option><option>Kumite</option><option>Team</option>
-    </select>
-
-    <select id="medal">
-      <option>None</option><option>Gold</option><option>Silver</option><option>Bronze</option>
-    </select>
-
-    <button class="saveBtn" type="submit">Save</button>
-    <button class="clearBtn" type="button" id="clear">Clear</button>
-  </form>
+  <footer>Built for District Senshuken — Firebase Realtime DB</footer>
 </div>
 
-<div class="box">
-  <h3>Entries (<span id="count">0</span>)</h3>
-  <div id="list"></div>
-  <button class="saveBtn" id="export">Export CSV</button>
-</div>
+<!-- Firebase v9 modular code -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+  import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
-<script>
-// ------------------ IndexedDB Setup ------------------
-let db;
-const DB_NAME = 'senshukenDB';
-const STORE = 'participants';
-
-const request = indexedDB.open(DB_NAME, 1);
-
-request.onupgradeneeded = (event)=>{
-  db = event.target.result;
-  if(!db.objectStoreNames.contains(STORE)){
-    db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
-  }
-};
-
-request.onsuccess = ()=>{
-  db = request.result;
-  loadData();
-};
-
-request.onerror = ()=> alert('IndexedDB failed to load');
-
-//-------------------------------------------------------
-
-function addToDB(obj){
-  const tx = db.transaction(STORE, 'readwrite');
-  tx.objectStore(STORE).add(obj);
-  tx.oncomplete = loadData;
-}
-
-function getAll(){
-  return new Promise(resolve=>{
-    const tx = db.transaction(STORE, 'readonly');
-    const store = tx.objectStore(STORE);
-    const req = store.getAll();
-    req.onsuccess = ()=> resolve(req.result || []);
-  })
-}
-
-//-------------------------------------------------------
-
-const list = document.getElementById("list");
-const count = document.getElementById("count");
-
-async function loadData(){
-  const data = await getAll();
-  render(data);
-}
-
-function render(data){
-  list.innerHTML = "";
-
-  data.forEach((e)=>{
-    list.innerHTML += `
-      <div class='entry'>
-        <div>
-          <b>${e.name}</b><br>
-          <small>${e.age} • ${e.event}</small><br>
-        </div>
-        <div class="badge ${e.medal}">${e.medal}</div>
-      </div>`;
-  });
-
-  count.textContent = data.length;
-}
-
-//-------------------------------------------------------
-// Form Logic
-//-------------------------------------------------------
-
-form.onsubmit = (ev)=>{
-  ev.preventDefault();
-  const obj = {
-    name: name.value.trim(),
-    age: age.value.trim(),
-    event: event.value,
-    medal: medal.value,
-    time: new Date().toLocaleString()
+  // ------- YOUR FIREBASE CONFIG (INSTALLED) --------
+  const firebaseConfig = {
+    apiKey: "AIzaSyDr1nY15q7ypnM-oWH2-rbXr2bWdrk45R8",
+    authDomain: "data-eccae.firebaseapp.com",
+    databaseURL: "https://data-eccae-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "data-eccae",
+    storageBucket: "data-eccae.firebasestorage.app",
+    messagingSenderId: "641767605032",
+    appId: "1:641767605032:web:b0a9ceb017dc8e707c461d",
+    measurementId: "G-JN0BY3199B"
   };
-  if(!obj.name) return alert("Name required");
+  // --------------------------------------------------
 
-  addToDB(obj);
-  form.reset();
-}
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const base = ref(db, "participants");
 
-clear.onclick = ()=> form.reset();
+  const statusEl = document.getElementById("status");
+  const listEl = document.getElementById("list");
+  const countEl = document.getElementById("count");
 
-//-------------------------------------------------------
-// Export CSV
-//-------------------------------------------------------
+  function setStatus(s){ statusEl.textContent = s; }
 
-export.onclick = async ()=>{
-  const data = await getAll();
-  if(!data.length) return alert("No entries to export");
+  // LISTEN REALTIME
+  onValue(base, snap=>{
+    const data = snap.val() || {};
+    const arr = Object.entries(data).map(([id,val])=>({id, ...val}));
 
-  const rows = ["Name,Age,Event,Medal,Time"];
-  data.forEach(r=>{
-    rows.push(`"${r.name}","${r.age}","${r.event}","${r.medal}","${r.time}"`)
+    renderList(arr);
+    setStatus("Connected");
   });
 
-  const blob = new Blob([rows.join("\n")],{type:"text/csv"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "senshuken_results.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-}
+  // RENDER
+  function renderList(data){
+    const q = document.getElementById("search").value.toLowerCase();
+    const f = document.getElementById("filterEvent").value;
 
+    const filtered = data.filter(item=>{
+      if(f !== "All" && item.event !== f) return false;
+      if(q && !item.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+
+    listEl.innerHTML = "";
+    filtered.forEach(it=>{
+      listEl.innerHTML += `
+        <div class="entry">
+          <div>
+            <div style="font-weight:700">${it.name}</div>
+            <div class="meta">${it.age_group||"-"} • ${it.gender||"-"} • ${it.event}</div>
+          </div>
+          <div class="badge ${it.medal}">${it.medal}</div>
+        </div>
+      `;
+    });
+
+    countEl.textContent = filtered.length;
+  }
+
+  // ADD ENTRY
+  document.getElementById("addForm").onsubmit = async (e)=>{
+    e.preventDefault();
+    const data = {
+      name: name.value.trim(),
+      age_group: age_group.value.trim(),
+      gender: gender.value,
+      event: event.value,
+      medal: medal.value,
+      created_at: new Date().toISOString()
+    };
+    if(!data.name) return alert("Name required");
+
+    setStatus("Saving...");
+    const newRef = push(base);
+    await set(newRef, data);
+    setStatus("Saved");
+    e.target.reset();
+  };
+
+  // Refresh (manual)
+  document.getElementById("refreshBtn").onclick = ()=>{
+    setStatus("Refreshing…");
+    setTimeout(()=>setStatus("Connected"),800);
+  };
+
+  document.getElementById("clearBtn").onclick = ()=> addForm.reset();
+
+  // CSV Export
+  document.getElementById("exportBtn").onclick = async ()=>{
+    setStatus("Exporting…");
+    const snap = await new Promise(res=> onValue(base, s=>{res(s)}, {onlyOnce:true}));
+    const data = snap.val() || {};
+    const rows = [["Name","Age Group","Gender","Event","Medal","Created At"]];
+    Object.values(data).forEach(r=> rows.push([r.name,r.age_group,r.gender,r.event,r.medal,r.created_at]));
+
+    const csv = rows.map(r=> r.map(c=> `"${c||""}"`).join(",")).join("\n");
+    const blob = new Blob([csv], {type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "senshuken_results.csv"; a.click();
+    URL.revokeObjectURL(url);
+    setStatus("Exported");
+  };
 </script>
 </body>
 </html>
